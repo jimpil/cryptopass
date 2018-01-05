@@ -13,16 +13,6 @@
   {:hmac-sha1   "PBKDF2WithHmacSHA1"
    :hmac-sha256 "PBKDF2WithHmacSHA256"})
 
-(defn- aconcat-chars!
-  ^chars [^chars a1 ^chars a2]
-  (let [a1-length (alength a1)
-        a2-length (alength a2)
-        ret (char-array (unchecked-add-int a1-length a2-length))]
-    (System/arraycopy a1 0 ret 0 a1-length)
-    (System/arraycopy a2 0 ret a1-length a2-length)
-    (Arrays/fill a1 \u0000)
-    (Arrays/fill a2 \u0000)
-    ret))
 
 (defn hash-pwd
   "Get a PBKDF2 (key-stretching) hash for the given string <pwd>.
@@ -40,11 +30,10 @@
 
   Returns the hashed password prefixed with salt (in base64), the iterations and the key-length."
 
-  [^chars pwd {:keys [algo salt key-length iterations encoding]
+  [^chars pwd {:keys [algo salt key-length iterations]
                :or {algo :hmac-sha256 ;; prefer this please
                     iterations 2000 ;; 2000 iterations is a reasonable starting point
                     key-length 192  ;; 192-bit long
-                    encoding "UTF-8"
                     salt (ut/secure-random-bytes 10)}}] ;; 10 random bytes (generated from a cryptographically secure source)
   (assert (contains? pbkdf2-algorithms algo)
           "Algorithm not recognised! :hmac-sha1 & :hmac-sha256 (starting with JDK8) are supported.")
@@ -52,20 +41,20 @@
   (let [[^bytes salt-bytes salt-chars] (cond
                                          (bytes? salt)
                                          [salt
-                                          (ut/bytes->chars true encoding salt)]
+                                          (ut/bytes->chars "UTF-8" salt)]
 
                                          (string? salt)
-                                         [(.getBytes ^String salt ^String encoding)
+                                         [(.getBytes ^String salt "UTF-8")
                                           (.toCharArray ^String salt)]
 
                                          :else
                                          (throw (IllegalArgumentException. ":salt can be either a String or a byte-array.")))
         ;; prepend the salt to the hash
-        salt+x-chars (aconcat-chars! salt-chars pwd) ;; this call will clear both args
+        ^chars salt+x-chars (ut/aconcat-chars! salt-chars pwd) ;; this call will clear both args
         f (SecretKeyFactory/getInstance (algo pbkdf2-algorithms))
         k (PBEKeySpec. salt+x-chars salt-bytes iterations key-length)
-        salt-b64 (ut/bytes->base64-str salt :plain encoding)
-        hashed-pwd (-> (.generateSecret f k) .getEncoded (ut/bytes->base64-str :plain encoding))]
+        salt-b64 (ut/bytes->base64-str salt :plain "UTF-8")
+        hashed-pwd (-> (.generateSecret f k) .getEncoded (ut/bytes->base64-str :plain "UTF-8"))]
     ;; we're done  - clear all the remaining arrays
     (Arrays/fill salt+x-chars \u0000)
     (Arrays/fill salt-bytes (byte 0))
@@ -73,7 +62,7 @@
 
 
 (defn matches?
-  "Given some <user-input>, a salt & a pbkdf2 hash (both fetched from DB in base64),
+  "Given some <user-input>, a pbkdf2 hash (presumably fetched from DB in base64),
    returns true if the <user-input> matches the one contained in the hash.
    <opts> per `hash-pwd`."
   [^String user-input hashed-db opts]
@@ -83,4 +72,3 @@
                                                 :key-length (Long/parseLong key-length)
                                                 :iterations (Long/parseLong iter)))]
     (= hashed-db hashed)))
-

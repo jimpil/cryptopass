@@ -1,6 +1,8 @@
 (ns cryptopass.impl.cljBCrypt
-  (:require [cryptopass.utils :as ut])
-  (:import (java.io UnsupportedEncodingException)))
+  (:require [cryptopass.utils :as ut]
+            [cryptopass.core :refer [*stealth?*]])
+  (:import (java.io UnsupportedEncodingException)
+           (java.util Arrays)))
 
 ;; A faithful port of jBCrypt (0.4) in Clojure.
 
@@ -588,7 +590,7 @@
 ;;===========================<PUBLIC API>==================================
 (defn hash-pwd
   "Hash a <password> using the OpenBSD bcrypt scheme."
-  ^String [^String password ^String salt]
+  ^String [password ^String salt]
 
   (when (or (not= \$ (.charAt salt 0))
             (not= \2 (.charAt salt 1)))
@@ -611,16 +613,23 @@
                               (unchecked-add-int off 3)
                               (unchecked-add-int off 25))
         minor-int (int minor)
-        password-bs (try
-                      (-> password
-                          (str (when (>= minor-int (int \a))
-                                 "\000"))
-                          (.getBytes "UTF-8"))
-                      (catch UnsupportedEncodingException _
-                        (throw (IllegalStateException. "UTF-8 is not supported"))))
+        ^bytes password-bs (try
+                             (if (string? password)
+                               (-> password
+                                   (str (when (>= minor-int (int \a))
+                                          "\000"))
+                                   (.getBytes "UTF-8"))
+                               ;; got chars
+                               (ut/chars->bytes "UTF-8"
+                                 (cond-> password
+                                         (>= minor-int (int \a)) (ut/aconcat-chars! (char-array [(char 0)])))))
+                             (catch UnsupportedEncodingException _
+                               (throw (IllegalStateException. "UTF-8 is not supported"))))
         ^bytes saltb (decode-b64 real-salt BCRYPT-SALT-LEN)
         ^bytes hashed (crypt-raw password-bs saltb rounds ^ints (aclone ciphertext))
         rs (StringBuilder.)]
+    (when *stealth?*
+      (Arrays/fill password-bs (byte 0)))
     (.append rs "$2")
     (when (>= minor-int (int \a))
       (.append rs minor))

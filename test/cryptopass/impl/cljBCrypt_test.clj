@@ -86,14 +86,12 @@
 
 (deftest gen-salt-tests
   (testing "`gen-salt`"
-    (loop [i (count test-vectors)]
-      (when (> i 0)
-        (let [plain (get-in test-vectors [i 0])
-              salt (gen-salt)
-              hashed1 (hash-pwd plain salt)
-              hashed2 (hash-pwd plain hashed1)]
-          (is (= hashed1 hashed2))
-          (recur (unchecked-multiply i 4))))))
+    (doseq [i (range 0 (count test-vectors) 4)]
+      (let [plain (get-in test-vectors [i 0])
+            salt (gen-salt)
+            hashed1 (hash-pwd plain salt)
+            hashed2 (hash-pwd plain hashed1)]
+        (is (= hashed1 hashed2)))))
 
   (testing "`gen-salt` with custom log-rounds"
     (doseq [i (range 4 13)

@@ -1,5 +1,7 @@
 (ns cryptopass.core)
 
+(def ^:dynamic *stealth?* true)
+
 (defprotocol ICryptoHashable
   (hash-pwd* [this hash-fn options])
   (check-pwd* [this hash-fn-ret check-fn opts])
