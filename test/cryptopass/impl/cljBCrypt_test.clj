@@ -1,11 +1,12 @@
 (ns cryptopass.impl.cljBCrypt-test
   (:require [clojure.test :refer :all]
             [cryptopass.impl.cljBCrypt :refer :all])
-  (:import (clojure.lang PersistentVector)))
+  (:import (clojure.lang PersistentVector)
+           (java.util.concurrent.atomic AtomicInteger)))
 
 
 (def ^:private test-vectors
-  [
+  [;; every 4th vector we have a 10 round salt
    [ "",
     "$2a$06$DCq7YPn5Rq63x1Lad4cll.",
     "$2a$06$DCq7YPn5Rq63x1Lad4cll.TV4S6ytwfsfvkgY8jIucDrjc8deX1s." ],
@@ -86,21 +87,16 @@
 
 (deftest gen-salt-tests
   (testing "`gen-salt`"
-    (doseq [i (range 0 (count test-vectors) 4)]
-      (let [plain (get-in test-vectors [i 0])
-            salt (gen-salt)
-            hashed1 (hash-pwd plain salt)
-            hashed2 (hash-pwd plain hashed1)]
-        (is (= hashed1 hashed2)))))
-
-  (testing "`gen-salt` with custom log-rounds"
-    (doseq [i (range 4 13)
-            j (range 0 (count test-vectors) 4)]
-      (let [plain (get-in test-vectors [j 0])
-            salt (gen-salt i)
-            hashed1 (hash-pwd plain salt)
-            hashed2 (hash-pwd plain hashed1)]
-        (is (= hashed1 hashed2)))))
+    (let [off (AtomicInteger. 0)]
+      (doseq [i (range 6 13 2) ;; 6, 8, 10, 12
+              j (range (.getAndIncrement off) (count test-vectors) 4)]
+        (assert (.startsWith (get-in test-vectors [j 1])
+                             (str "$2a$" (cond->> i (< i 10) (str \0)) "$")))
+        (let [plain (get-in test-vectors [j 0])
+              salt (gen-salt i)
+              hashed1 (hash-pwd plain salt)
+              hashed2 (hash-pwd plain hashed1)]
+          (is (= hashed1 hashed2))))))
   )
 
 (deftest pwd-matches?-tests
