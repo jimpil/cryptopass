@@ -1,5 +1,6 @@
 (ns cryptopass.impl.pbkdf2
   (:require [cryptopass.utils :as ut]
+            [cryptopass.core :refer [*stealth?*]]
             [clojure.string :as str])
   (:import (javax.crypto.spec PBEKeySpec)
            (javax.crypto SecretKeyFactory)
@@ -55,9 +56,10 @@
         k (PBEKeySpec. salt+x-chars salt-bytes iterations key-length)
         salt-b64 (ut/bytes->base64-str salt :plain "UTF-8")
         hashed-pwd (-> (.generateSecret f k) .getEncoded (ut/bytes->base64-str :plain "UTF-8"))]
-    ;; we're done  - clear all the remaining arrays
-    (Arrays/fill salt+x-chars \u0000)
-    (Arrays/fill salt-bytes (byte 0))
+
+    (when *stealth?*
+      (Arrays/fill salt+x-chars \u0000)
+      (Arrays/fill salt-bytes (byte 0)))
     (str salt-b64 \$ iterations \$ key-length \$ hashed-pwd)))
 
 
