@@ -8,6 +8,7 @@
   )
 
 (extend-protocol ICryptoHashable
+
   (Class/forName "[C")
   (hash-pwd* [this hash-fn opts]
     (hash-fn this opts))

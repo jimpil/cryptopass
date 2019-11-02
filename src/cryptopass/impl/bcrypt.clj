@@ -1,4 +1,4 @@
-(ns cryptopass.impl.cljBCrypt
+(ns cryptopass.impl.bcrypt
   (:require [cryptopass.utils :as ut]
             [cryptopass.core :refer [*stealth?*]])
   (:import (java.io UnsupportedEncodingException)

@@ -1,8 +1,9 @@
-(ns cryptopass.impl.cljBCrypt-test
+(ns cryptopass.impl.bcrypt-test
   (:require [clojure.test :refer :all]
-            [cryptopass.impl.cljBCrypt :refer :all])
+            [cryptopass.impl.bcrypt :refer :all])
   (:import (clojure.lang PersistentVector)
-           (java.util.concurrent.atomic AtomicInteger)))
+           (java.util.concurrent.atomic AtomicInteger)
+           (org.mindrot.jbcrypt BCrypt)))
 
 
 (def ^:private test-vectors
@@ -72,7 +73,9 @@
 (deftest hash-pwd-tests
   (testing "`hash-pwd`"
     (doseq [[plain salt expected] test-vectors]
-      (is (= expected (hash-pwd plain salt)))))
+      (is (= expected
+             (hash-pwd plain salt)
+             (BCrypt/hashpw plain salt)))))
 
   (testing "`hash-pwd` with international characters"
     (let [pw1 "\u2605\u2605\u2605\u2605\u2605\u2605\u2605\u2605"
@@ -95,8 +98,9 @@
         (let [plain (get-in test-vectors [j 0])
               salt (gen-salt i)
               hashed1 (hash-pwd plain salt)
-              hashed2 (hash-pwd plain hashed1)]
-          (is (= hashed1 hashed2))))))
+              hashed2 (hash-pwd plain hashed1)
+              hashed3 (BCrypt/hashpw plain salt)]
+          (is (= hashed1 hashed2 hashed3))))))
   )
 
 (deftest pwd-matches?-tests
